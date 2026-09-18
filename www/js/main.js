@@ -4,7 +4,8 @@
   const { h, icon, Busy, Files, App, $, toast } = PP;
 
   const TOOLS = [
-    { id: 'viewer', ico: 'view', title: 'View PDF', desc: 'Read any PDF, zoom and jump to pages', pickPdf: true },
+    { id: 'viewer', ico: 'view', title: 'View PDF', desc: 'Read any PDF, zoom and jump to pages', accept: 'application/pdf,.pdf' },
+    { id: 'sheet', ico: 'table', title: 'View Excel', desc: 'Open Excel and CSV files', accept: '.xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv' },
     { id: 'imgpdf', ico: 'image', title: 'Images to PDF', desc: 'Photos and scans into one PDF' },
     { id: 'merge', ico: 'merge', title: 'Merge PDFs', desc: 'Combine several PDFs into one' },
     { id: 'split', ico: 'split', title: 'Split & extract', desc: 'Pull out pages or cut a PDF apart' },
@@ -23,8 +24,8 @@
         h('div', { class: 'home-grid' }, TOOLS.map((t) => h('button', {
           type: 'button', class: 'tool-card', 'data-tool': t.id,
           onclick: async () => {
-            if (t.pickPdf) {
-              const [f] = await Files.pick({ accept: 'application/pdf,.pdf' });
+            if (t.accept) {
+              const [f] = await Files.pick({ accept: t.accept });
               if (f) App.open(t.id, { file: f });
             } else App.open(t.id);
           },
@@ -48,10 +49,13 @@
     const head = new Uint8Array(await got.blob.slice(0, 4).arrayBuffer());
     const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
     const isZip = head[0] === 0x50 && head[1] === 0x4b;                                          // PK
+    const isOle = head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0;   // old .xls
+    const isSheet = isOle || /\.(xlsx|xlsm|xlsb|xls|ods|csv|tsv)$/i.test(got.name);
     while (App.back()) { /* back to home */ }
     if (isPdf) App.open('viewer', { blob: got.blob, name: /\.pdf$/i.test(got.name) ? got.name : `${got.name}.pdf` });
+    else if (isSheet) App.open('sheet', { blob: got.blob, name: got.name });
     else if (isZip) App.open('zip', { blob: got.blob, name: got.name });
-    else toast("Pocket PDF can only open PDF and ZIP files.");
+    else toast("Pocket PDF can open PDF, Excel/CSV and ZIP files.");
   }
 
   if (PP.native) {
@@ -73,6 +77,7 @@
       if (!files.length) return;
       while (App.back()) { /* home */ }
       if (files.length === 1 && /\.pdf$/i.test(files[0].name)) App.open('viewer', { file: files[0] });
+      else if (files.length === 1 && /\.(xlsx|xlsm|xls|ods|csv)$/i.test(files[0].name)) App.open('sheet', { file: files[0] });
       else if (files.length === 1 && /\.zip$/i.test(files[0].name)) App.open('zip', { blob: files[0], name: files[0].name });
       else App.open('imgpdf', { files });
     });

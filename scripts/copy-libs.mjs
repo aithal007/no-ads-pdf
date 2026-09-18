@@ -7,6 +7,7 @@ mkdirSync(`${out}/pdfjs`, { recursive: true });
 
 cpSync('node_modules/pdf-lib/dist/pdf-lib.min.js', `${out}/pdf-lib.min.js`);
 cpSync('node_modules/fflate/umd/index.js', `${out}/fflate.min.js`);
+cpSync('node_modules/xlsx/dist/xlsx.full.min.js', `${out}/xlsx.full.min.js`); // Excel/CSV reader, loaded on demand
 // Capacitor's JS API (registerPlugin etc.). On Android it extends the bare bridge the WebView injects.
 cpSync('node_modules/@capacitor/core/dist/capacitor.js', `${out}/capacitor.js`);
 

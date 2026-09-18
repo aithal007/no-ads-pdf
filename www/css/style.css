@@ -266,3 +266,30 @@ dialog::backdrop { background: #000a; }
 .preview-body pre { text-align: left; white-space: pre-wrap; word-break: break-word; margin: 0; font-size: .82rem; }
 
 @media (prefers-reduced-motion: reduce) { .btn, .tool-card { transition: none; } }
+
+/* ───── Excel viewer ───── */
+.vbar .sheet-select { width: auto; max-width: 42vw; min-height: 40px; padding: 0 8px; font-size: .9rem; font-weight: 600; }
+.vbar .sheet-name { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+.sheet-info { flex: none; padding: 4px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.sheet-scroll { background: var(--surface); touch-action: pan-x pan-y pinch-zoom; -webkit-overflow-scrolling: touch; }
+.grid-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 13px; }
+.grid-table th, .grid-table td {
+  border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 6px 8px; height: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.grid-table thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--accent-soft); color: var(--muted);
+  font-weight: 700; text-align: center; height: 30px;
+}
+.grid-table th.rn { position: sticky; left: 0; z-index: 1; background: var(--accent-soft); color: var(--muted); font-weight: 600; text-align: center; padding: 6px 2px; }
+.grid-table thead th.rn { z-index: 3; }
+.grid-table td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.grid-table td.b { text-align: center; }
+.grid-table td.sel { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.cellbar {
+  flex: none; display: flex; gap: 10px; align-items: baseline; padding: 8px 12px calc(8px + var(--bottom));
+  background: var(--surface); border-top: 1px solid var(--border); font-size: .88rem; max-height: 26vh; overflow: auto;
+}
+.cellbar strong { color: var(--accent); flex: none; }
+.cellbar .cv { word-break: break-word; white-space: pre-wrap; min-width: 0; }
+.cellbar .cf { color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; }

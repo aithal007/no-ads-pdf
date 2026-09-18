@@ -8,6 +8,7 @@
   function previewKind(name) {
     const m = mimeFor(name);
     if (m === 'application/pdf') return 'pdf';
+    if (/^(xlsx|xlsm|xls|xlsb|ods)$/.test(ext(name))) return 'sheet';
     if (m.startsWith('image/') && ext(name) !== 'avif') return 'image';
     if (m.startsWith('video/')) return 'video';
     if (m.startsWith('audio/')) return 'audio';
@@ -122,6 +123,7 @@
 
   function preview(entry, kind) {
     if (kind === 'pdf') { App.open('viewer', { blob: asBlob(entry.name), name: baseName(entry.name) }); return; }
+    if (kind === 'sheet') { App.open('sheet', { blob: asBlob(entry.name), name: baseName(entry.name) }); return; }
     let data;
     try { data = extract(entry.name); } catch (_) { toast("Couldn't extract that file."); return; }
 
