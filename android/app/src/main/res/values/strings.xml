@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pocket PDF</string>
+    <string name="title_activity_main">Pocket PDF</string>
+    <string name="package_name">com.parikshith.pocketpdf</string>
+    <string name="custom_url_scheme">com.parikshith.pocketpdf</string>
+</resources>

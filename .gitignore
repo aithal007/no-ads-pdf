@@ -1,0 +1,21 @@
+# Dependencies and build output (all re-created by `npm install` / `build-apk.ps1`)
+node_modules/
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+
+# The APK is published under GitHub Releases instead of being committed
+*.apk
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db

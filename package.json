@@ -1,0 +1,24 @@
+{
+  "name": "pocket-pdf",
+  "version": "1.0.0",
+  "description": "Ad-free offline PDF toolkit for Android",
+  "scripts": {
+    "libs": "node scripts/copy-libs.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "fflate": "^0.8.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  },
+  "private": true
+}
