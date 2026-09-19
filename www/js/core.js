@@ -110,9 +110,18 @@
 
   // ───────────── toast ─────────────
 
+  // A <dialog> opened with showModal() sits above everything else on the page, including the toast and the busy
+  // overlay. So while one is open they have to live inside the topmost dialog to be seen (and tapped).
+  function onTop(el) {
+    const open = document.querySelectorAll('dialog[open]');
+    const host = open.length ? open[open.length - 1] : document.body;
+    if (el.parentNode !== host) host.append(el);
+  }
+
   let toastTimer;
   function toast(msg, { action, ms = 5000 } = {}) {
     const t = $('#toast');
+    onTop(t);
     t.replaceChildren(h('span', {}, msg));
     if (action) {
       t.append(h('button', { type: 'button', class: 'toast-action', onclick: () => { t.hidden = true; action.fn(); } }, action.label));
@@ -141,6 +150,7 @@
         const bar = $('#busy-bar');
         $('#busy-text').textContent = label;
         bar.removeAttribute('value');
+        onTop(box);
         box.hidden = false;
         const p = {
           async tick(text, done, total) {

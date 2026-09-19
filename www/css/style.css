@@ -319,3 +319,38 @@ dialog.crop-dialog[open] {
 /* the switch sits inside the settings card, whose labels are stacked columns: keep it a row */
 .settings .auto-crop { flex-direction: row; color: var(--text); font-size: .9rem; font-weight: 400; }
 .settings .auto-crop .muted { font-size: .85rem; }
+
+/* ───── Full-screen photo view (tap a picture in Images to PDF) ───── */
+.frame.tappable { cursor: pointer; }
+dialog.photo-dialog[open] {
+  display: flex; flex-direction: column; width: 100vw; height: 100dvh; max-width: none; max-height: none;
+  margin: 0; border: 0; border-radius: 0; background: #000; color: #fff;
+  padding: var(--top) var(--right) var(--bottom) var(--left);
+}
+.pv-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #111; }
+.pv-head .icon-btn { color: #fff; }
+.pv-count { flex: 1; text-align: center; }
+.pv-head .btn { color: #fff; border-color: #fff4; }
+.pv-stage { position: relative; flex: 1; min-height: 0; display: flex; }
+.pv-track {
+  flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory;
+  scrollbar-width: none; overscroll-behavior: contain;
+}
+.pv-track::-webkit-scrollbar { display: none; }
+.pv-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; display: grid; place-items: center; }
+.pv-slide img { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
+.pv-slide img:not([src]) { visibility: hidden; }
+.pv-wait { color: #fffa; }
+.pv-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 64px; border: 0; padding: 0;
+  display: grid; place-items: center; color: #fff; background: #0008; cursor: pointer;
+}
+.pv-nav.prev { left: 0; border-radius: 0 12px 12px 0; }
+.pv-nav.next { right: 0; border-radius: 12px 0 0 12px; }
+.pv-nav[hidden] { display: none; }
+.pv-bar { display: flex; background: #111; border-top: 1px solid #fff2; }
+.pv-bar button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px 12px;
+  border: 0; background: transparent; color: #fff; font: inherit; font-size: .75rem; cursor: pointer;
+}
+.pv-bar button.warn { color: #f87171; }

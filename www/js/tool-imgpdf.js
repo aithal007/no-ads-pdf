@@ -5,6 +5,7 @@
   const { buildPdf, layoutPage } = window.PdfKit;
 
   const THUMB_PX = 440; // tiles are ~200 CSS px wide, which is 500+ device pixels on a phone
+  const VIEW_PX = 1600; // the full-screen photo view
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i;
   const QUALITY = {
     high: { maxDim: 3000, q: 0.9 },
@@ -65,6 +66,25 @@
     return { jpeg: new Uint8Array(await blob.arrayBuffer()), pxW, pxH };
   }
 
+  // Big picture for the full-screen view: the page as it will appear in the PDF, or the whole photo (`whole`).
+  // Cached on the item; dropBig() forgets it when the crop or rotation changes.
+  async function bigOf(item, whole) {
+    const key = whole && item.quad ? 'bigWhole' : 'big';
+    if (item[key]) return item[key];
+    const img = await loadImage(item.file);
+    const canvas = drawImage(pageSource(img, key === 'big' ? item.quad : null, VIEW_PX), item.rot, VIEW_PX);
+    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
+    canvas.width = canvas.height = 0;
+    if (!item[key]) item[key] = URL.createObjectURL(blob);
+    return item[key];
+  }
+
+  function dropBig(item) {
+    for (const k of ['big', 'bigWhole']) if (item[k]) { URL.revokeObjectURL(item[k]); item[k] = null; }
+  }
+
+  function forget(item) { URL.revokeObjectURL(item.thumb); dropBig(item); }
+
   async function thumbOf(img, quad) {
     const canvas = drawImage(pageSource(img, quad, THUMB_PX), 0, THUMB_PX);
     const blob = await canvasToBlob(canvas, 'image/jpeg', 0.7);
@@ -116,15 +136,19 @@
     ui.work.hidden = n === 0;
     ui.count.textContent = `${n} image${n === 1 ? '' : 's'}`;
     ui.grid.replaceChildren(...items.map((it, i) => h('li', { class: 'tile' },
-      h('span', { class: 'frame' }, h('img', { src: it.thumb, alt: `Page ${i + 1}: ${it.file.name}`, style: `transform:rotate(${it.rot}deg)` })),
+      h('span', {
+        class: 'frame tappable', role: 'button', tabindex: 0, 'aria-label': `Open page ${i + 1}`,
+        onclick: () => openViewer(i),
+        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openViewer(i); } },
+      }, h('img', { src: it.thumb, alt: `Page ${i + 1}: ${it.file.name}`, style: `transform:rotate(${it.rot}deg)` })),
       h('span', { class: 'num' }, i + 1),
       it.quad ? h('span', { class: 'crop-badge' }, 'Cropped') : null,
       h('div', { class: 'tools' },
         tileBtn('Move earlier', 'left', () => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; changed(); }, { disabled: i === 0 }),
         tileBtn('Crop and straighten', 'crop', () => openEditor(it)),
-        tileBtn('Rotate', 'rotate', () => { it.rot = (it.rot + 90) % 360; changed(); }),
+        tileBtn('Rotate', 'rotate', () => { it.rot = (it.rot + 90) % 360; dropBig(it); changed(); }),
         tileBtn('Move later', 'right', () => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; changed(); }, { disabled: i === n - 1 }),
-        tileBtn('Remove', 'x', () => { URL.revokeObjectURL(it.thumb); items.splice(i, 1); changed(); }, { warn: true }),
+        tileBtn('Remove', 'x', () => { forget(it); items.splice(i, 1); changed(); }, { warn: true }),
       ))));
   }
 
@@ -240,7 +264,7 @@
   }
 
   async function openEditor(item) {
-    if (!ed) buildEditor();
+    ensureDialogs();
     ed.item = item;
     const img = await Busy.run('Opening…', () => loadImage(item.file));
     if (!img) return;
@@ -282,9 +306,133 @@
     const thumb = await Busy.run('Updating…', () => thumbOf(img, quad));
     if (!thumb) return;
     URL.revokeObjectURL(item.thumb);
+    dropBig(item);
     item.thumb = thumb;
     item.quad = quad;
     changed();
+    if (pv && pv.dlg.open) buildSlides(items.indexOf(item));
+  }
+
+
+  // ── full-screen photo view: swipe between pages, crop, rotate, save, remove ──
+  let pv = null;
+
+  function ensureDialogs() {
+    if (!pv) buildViewer(); // first, so the crop editor (built next) sits above it
+    if (!ed) buildEditor();
+  }
+
+  function buildViewer() {
+    const count = h('strong', { class: 'pv-count' });
+    const wholeBtn = h('button', { class: 'btn small ghost', type: 'button', onclick: () => { pv.whole = !pv.whole; buildSlides(pv.index); } });
+    const track = h('div', { class: 'pv-track' });
+    const prev = h('button', { class: 'pv-nav prev', type: 'button', 'aria-label': 'Previous page', onclick: () => goTo(pv.index - 1) }, icon('left', 28));
+    const next = h('button', { class: 'pv-nav next', type: 'button', 'aria-label': 'Next page', onclick: () => goTo(pv.index + 1) }, icon('right', 28));
+    const act = (label, ico, fn, cls = '') => h('button', { type: 'button', class: cls, onclick: fn }, icon(ico, 22), h('span', {}, label));
+    const dlg = h('dialog', { class: 'photo-dialog' },
+      h('div', { class: 'pv-head' },
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dlg.close() }, icon('back', 24)),
+        count, wholeBtn),
+      h('div', { class: 'pv-stage' }, track, prev, next),
+      h('div', { class: 'pv-bar' },
+        act('Crop', 'crop', () => { const it = items[pv.index]; if (it) openEditor(it); }),
+        act('Rotate', 'rotate', () => { const it = items[pv.index]; if (!it) return; it.rot = (it.rot + 90) % 360; dropBig(it); changed(); buildSlides(pv.index); }),
+        act('Save', 'save', () => savePhoto()),
+        act('Remove', 'trash', () => removeCurrent(), 'warn')));
+    document.body.append(dlg);
+    pv = { dlg, track, count, wholeBtn, prev, next, index: 0, whole: false, filling: 0 };
+
+    let settle;
+    track.addEventListener('scroll', () => {
+      clearTimeout(settle);
+      settle = setTimeout(() => {
+        const i = Math.min(items.length - 1, Math.max(0, Math.round(track.scrollLeft / Math.max(1, track.clientWidth))));
+        if (i !== pv.index) { pv.index = i; syncBar(); }
+        fillAround(i);
+      }, 60);
+    }, { passive: true });
+    dlg.addEventListener('close', () => { pv.filling++; });
+  }
+
+  function syncBar() {
+    const n = items.length;
+    const it = items[pv.index];
+    pv.count.textContent = n ? `${pv.index + 1} / ${n}` : '';
+    pv.prev.hidden = pv.index <= 0;
+    pv.next.hidden = pv.index >= n - 1;
+    pv.wholeBtn.hidden = !(it && it.quad);
+    pv.wholeBtn.textContent = pv.whole ? 'Show cropped page' : 'Show full photo';
+  }
+
+  function goTo(i) {
+    if (i < 0 || i >= items.length) return;
+    pv.track.scrollTo({ left: i * pv.track.clientWidth, behavior: 'smooth' });
+  }
+
+  // one slide per photo; the pictures are only made for the page on screen and its neighbours
+  function buildSlides(index) {
+    const { track } = pv;
+    pv.index = Math.min(items.length - 1, Math.max(0, index));
+    track.style.scrollSnapType = 'none';
+    track.replaceChildren(...items.map((it, i) => {
+      const img = h('img', { alt: `Page ${i + 1}`, draggable: false });
+      const ready = it[pv.whole && it.quad ? 'bigWhole' : 'big'];
+      if (ready) img.src = ready;
+      return h('div', { class: 'pv-slide' }, img, ready ? null : h('span', { class: 'pv-wait' }, 'Loading…'));
+    }));
+    track.scrollLeft = pv.index * track.clientWidth;
+    track.style.scrollSnapType = '';
+    syncBar();
+    fillAround(pv.index);
+  }
+
+  async function fillAround(i) {
+    const token = ++pv.filling;
+    for (const j of [i, i + 1, i - 1]) {
+      const it = items[j];
+      const slide = pv.track.children[j];
+      if (!it || !slide || slide.querySelector('img').getAttribute('src')) continue;
+      try {
+        const url = await bigOf(it, pv.whole);
+        if (token !== pv.filling || !pv.dlg.open) return;
+        const now = pv.track.children[j];
+        if (now && items[j] === it) { now.querySelector('img').src = url; const w = now.querySelector('.pv-wait'); if (w) w.remove(); }
+      } catch (e) {
+        console.error(e);
+        const w = slide.querySelector('.pv-wait');
+        if (w) w.textContent = 'This photo could not be opened';
+      }
+    }
+  }
+
+  function openViewer(i) {
+    ensureDialogs();
+    pv.whole = false;
+    pv.dlg.showModal();
+    buildSlides(i);
+  }
+
+  function removeCurrent() {
+    const it = items[pv.index];
+    if (!it) return;
+    forget(it);
+    items.splice(pv.index, 1);
+    changed();
+    if (!items.length) { pv.dlg.close(); return; }
+    buildSlides(pv.index);
+  }
+
+  async function savePhoto() {
+    const it = items[pv.index];
+    if (!it) return;
+    const whole = pv.whole;
+    const out = await Busy.run('Saving…', async () => {
+      const { jpeg } = await renderJpeg(it.file, it.rot, QUALITY.high, whole ? null : it.quad);
+      return new Blob([jpeg], { type: 'image/jpeg' });
+    });
+    if (!out) return;
+    const base = cleanName((it.file.name || '').replace(/\.[^.]+$/, ''), `page-${pv.index + 1}`);
+    await Files.saveWithToast(out, `${base}${it.quad && !whole ? '-page' : ''}.jpg`);
   }
 
   const pickImages = async () => addImages(await Files.pick({ accept: 'image/*', multiple: true }));
@@ -315,7 +463,7 @@
         h('div', { class: 'bar' }, ui.count, h('span', { class: 'spacer' }),
           h('button', { class: 'btn small', type: 'button', onclick: pickImages }, icon('plus', 18), 'Add'),
           h('button', { class: 'btn small ghost', type: 'button', onclick: takePhoto }, icon('camera', 18)),
-          h('button', { class: 'btn small ghost danger', type: 'button', onclick: () => { items.forEach((i) => URL.revokeObjectURL(i.thumb)); items = []; changed(); } }, 'Clear')),
+          h('button', { class: 'btn small ghost danger', type: 'button', onclick: () => { items.forEach(forget); items = []; changed(); } }, 'Clear')),
         ui.grid,
         h('div', { class: 'card settings' },
           h('div', { class: 'wide' }, autoSwitch()),
@@ -332,7 +480,8 @@
     enter(args) { if (args && args.files) addImages(args.files); },
 
     leave() {
-      items.forEach((i) => URL.revokeObjectURL(i.thumb));
+      if (pv && pv.dlg.open) pv.dlg.close();
+      items.forEach(forget);
       items = [];
       ui.result.replaceChildren();
       ui.name.value = '';

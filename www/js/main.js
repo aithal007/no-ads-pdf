@@ -33,7 +33,8 @@
         h('span', { class: 'ico-wrap' }, icon(t.ico, 24)),
         h('strong', {}, t.title),
         h('span', { class: 'd' }, t.desc)))),
-        h('p', { class: 'muted home-note' }, 'Your files never leave this phone. This app has no internet access at all.'));
+        h('p', { class: 'muted home-note' }, 'Your files never leave this phone. This app has no internet access at all.'),
+        h('p', { class: 'muted home-note', id: 'app-version' }));
     },
   });
 
@@ -61,13 +62,15 @@
   if (PP.native) {
     const CapApp = window.Capacitor.registerPlugin('App');
     CapApp.addListener('backButton', () => {
-      const open = document.querySelectorAll('dialog[open]');
-      if (open.length) { open.forEach((d) => d.close()); return; }
       if (!$('#busy').hidden) { Busy.cancel(); return; }
+      const open = document.querySelectorAll('dialog[open]');
+      if (open.length) { open[open.length - 1].close(); return; } // just the top one (the crop editor sits above the photo view)
       if (!App.back()) CapApp.exitApp();
     });
     CapApp.addListener('appUrlOpen', ({ url }) => handleIncoming(url));
     CapApp.getLaunchUrl().then((r) => { if (r && r.url) handleIncoming(r.url); }).catch(() => {});
+    // shown on the home screen so it is easy to tell which version is installed (never allowed to break start-up)
+    try { CapApp.getInfo().then((i) => { $('#app-version').textContent = `Version ${i.version}`; }).catch(() => {}); } catch (_) { /* ignore */ }
   } else {
     // Desktop browser (development): drag & drop a PDF, ZIP or images anywhere.
     addEventListener('dragover', (e) => e.preventDefault());

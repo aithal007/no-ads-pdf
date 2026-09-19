@@ -51,7 +51,8 @@ Big sheets load as you scroll, so a 50,000-row file won't freeze your phone. It'
 ### Images to PDF
 1. Tap **Choose images** (several at once) or **Take photo** for scanning paper documents.
 2. **Auto-crop pages** (on by default) finds the sheet of paper in each photo, cuts away the table or cloth behind it, and straightens it, like a scanner app. Photos that are already just a page are left alone. Those it cropped get a **Cropped** badge.
-3. Use the arrows under each picture to reorder, **↻** to rotate, **✕** to remove. Tap **+ Add** for more.
+3. **Tap a picture** to see it full screen. **Swipe** left or right to go through the pages. From there you can **Crop**, **Rotate**, **Save** the page as a JPG, or **Remove** it. **Show full photo** compares the crop with the original.
+   The buttons under each picture do the same quickly: arrows to reorder, **↻** to rotate, **✕** to remove. Tap **+ Add** for more.
 4. Pick a page size (A4, Letter, or same as the image), margin and quality, and give the file a name.
 5. Tap **Create PDF**.
 
