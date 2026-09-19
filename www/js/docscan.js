@@ -11,8 +11,8 @@
   const PAPER_MIN_VAL = 55;    // ...but not black
   const MIN_PAGE_FRACTION = 0.12;
   const EDGE_INSET = 0.008;
-  const GUTTER_MIN_RIDGE = 0.012; // a column counts as 'a dark line' in a row if it's this much darker than both neighbours
-  const GUTTER_MIN_AGREE = 0.65;  // ...in at least this share of the page's rows
+  const GUTTER_MIN_DEPTH = 0.03;  // along the crease the page is this much darker than on both sides (median over the rows)
+  const GUTTER_MAX_SLOPE = 0.16;  // the crease may lean by up to this much sideways per row (about 9 degrees)
   const GUTTER_MAX_TINT = 0.10;   // ...and isn't colourful (printed margin lines are)
   const CREASE_MIN_DEPTH = 0.02;  // full-resolution re-check: at least 2% darker than the paper beside it
   const CREASE_MIN_WIDTH = 0.004; // ...and at least 0.4% of the page width wide (a printed line is thinner)
@@ -98,16 +98,17 @@
     return { x0, x1, y0, y1 };
   }
 
-  // Open notebooks show two pages. A crease is a thin, neutral-coloured dark line that runs the whole height of
-  // the paper, so we count how many rows agree that a column is darker than both of its neighbours.
-  // (Text and shading only agree in a minority of rows; a printed margin line is coloured, so it's rejected.)
-  // Returns { x: column to cut at or -1, frac: best agreement seen, at: where }.
+  // Open notebooks show two pages. A crease is a neutral-coloured dark line that runs the whole height of the paper,
+  // but it is rarely perfectly upright or straight. So we look at how bright the page is along many slightly leaning
+  // lines: the median over all rows ignores text, and only a true crease is darker than both of its sides.
+  // Returns { line: {a, b} with x = a*y + b, or null; depth: how much darker; at: where }.
   function findGutter(mask, lum, sat, w, h, b, side) {
     const bw = b.x1 - b.x0 + 1;
     const bh = b.y1 - b.y0 + 1;
-    const none = { x: -1, frac: 0, at: -1 };
+    const none = { line: null, depth: 0, at: -1, tint: 0 };
     if (bw < 40 || bh < 40) return none;
-    const k = Math.max(2, Math.round(Math.max(w, h) / 150));
+    const k0 = Math.max(2, Math.round(Math.max(w, h) / 150));
+    const kMax = 2 * k0;
 
     // brightness relative to the row's typical brightness (removes top-to-bottom shading)
     const rowBase = new Float32Array(h);
@@ -117,56 +118,105 @@
       if (vals.length > bw * 0.3) { vals.sort((p, q) => p - q); rowBase[y] = vals[vals.length >> 1]; }
     }
 
-    const from = Math.max(b.x0 + k, side === 'left' ? b.x0 + Math.round(bw * 0.05) : b.x1 - Math.round(bw * 0.40));
-    const to = Math.min(b.x1 - k, side === 'left' ? b.x0 + Math.round(bw * 0.40) : b.x1 - Math.round(bw * 0.05));
-    let best = { x: -1, frac: 0, tint: 0 };
-    for (let x = from; x <= to; x++) {
-      let rows = 0, dark = 0, tint = 0;
-      for (let y = b.y0; y <= b.y1; y++) {
-        const i = y * w + x;
-        if (!(rowBase[y] > 0 && mask[i] && mask[i - k] && mask[i + k])) continue;
-        rows++;
-        const ridge = (lum[i - k] + lum[i + k]) / 2 / rowBase[y] - lum[i] / rowBase[y];
-        if (ridge > GUTTER_MIN_RIDGE) { dark++; tint += sat[i] - (sat[i - k] + sat[i + k]) / 2; }
+    const from = side === 'left' ? b.x0 + Math.round(bw * 0.05) : b.x1 - Math.round(bw * 0.40);
+    const to = side === 'left' ? b.x0 + Math.round(bw * 0.40) : b.x1 - Math.round(bw * 0.05);
+    const yA = b.y0 + Math.round(bh * 0.06);
+    const yB = b.y1 - Math.round(bh * 0.06);
+    const yMid = (yA + yB) / 2;
+    const rowsUsed = [];
+    for (let y = yA; y <= yB; y += 3) if (rowBase[y] > 0) rowsUsed.push(y);
+    if (rowsUsed.length < bh * 0.15) return none;
+
+    // median (over the rows) of the page's brightness along a line that leans by `slope`, through column x at mid-height
+    const BINS = 300, LO = 0.4, STEP = 0.004;
+    const hist = new Int32Array(BINS);
+    const need = rowsUsed.length * 0.6;
+    const brightness = (x, slope) => {
+      hist.fill(0);
+      let n = 0;
+      for (const y of rowsUsed) {
+        const xx = Math.round(x + slope * (y - yMid));
+        if (xx < 0 || xx >= w) continue;
+        const i = y * w + xx;
+        if (!mask[i]) continue;
+        hist[Math.min(BINS - 1, Math.max(0, ((lum[i] / rowBase[y] - LO) / STEP) | 0))]++;
+        n++;
       }
-      if (rows < bh * 0.5) continue;
-      const frac = dark / rows;
-      if (frac > best.frac) best = { x, frac, tint: dark ? tint / dark : 0 };
+      if (n < need) return NaN;
+      let acc = 0, bin = 0;
+      while (bin < BINS - 1 && (acc += hist[bin]) * 2 < n) bin++;
+      return LO + (bin + 0.5) * STEP;
+    };
+    const colour = (x, slope) => {
+      const v = [];
+      for (const y of rowsUsed) {
+        const xx = Math.round(x + slope * (y - yMid));
+        if (xx >= 0 && xx < w && mask[y * w + xx]) v.push(sat[y * w + xx]);
+      }
+      v.sort((p, q) => p - q);
+      return v.length ? v[v.length >> 1] : 0;
+    };
+
+    const lo = from - kMax, hi = to + kMax;
+    let best = { depth: 0, slope: 0, x: -1, k: k0 };
+    for (let slope = -GUTTER_MAX_SLOPE; slope <= GUTTER_MAX_SLOPE + 1e-9; slope += 0.02) {
+      const prof = new Float32Array(hi - lo + 1);
+      for (let x = lo; x <= hi; x++) prof[x - lo] = brightness(x, slope);
+      for (let x = from; x <= to; x++) {
+        for (const k of [k0, kMax]) {
+          const c = prof[x - lo], l = prof[x - k - lo], r = prof[x + k - lo];
+          if (!(c === c && l === l && r === r)) continue;
+          const depth = (l + r) / 2 - c;
+          if (depth > best.depth) best = { depth, slope, x, k };
+        }
+      }
     }
-    const isCrease = best.frac >= GUTTER_MIN_AGREE && best.tint < GUTTER_MAX_TINT;
-    return { x: isCrease ? best.x : -1, frac: best.frac, at: best.x, tint: best.tint };
+    if (best.x < 0) return none;
+    // a coloured line (red/blue margin rule) is not a crease
+    const tint = colour(best.x, best.slope) - (colour(best.x - best.k, best.slope) + colour(best.x + best.k, best.slope)) / 2;
+    const isCrease = best.depth >= GUTTER_MIN_DEPTH && tint < GUTTER_MAX_TINT;
+    // line through the crease: x = a*y + b
+    const line = { a: best.slope, b: best.x - best.slope * yMid };
+    return { line: isCrease ? line : null, depth: best.depth, at: best.x, tint, slope: best.slope, k: best.k };
   }
 
   // The candidate crease was found on the shrunken copy, where a thin printed margin line can look like one.
-  // Re-check it on a full-resolution strip of the photo: a crease is a wide, neutral-coloured shadow;
-  // a margin line is narrow and usually coloured (red, blue...).
-  function confirmCrease(img, x, b, w, h) {
+  // Re-check it on a full-resolution strip of the photo that follows the candidate line: a crease is a wide,
+  // neutral-coloured shadow; a margin line is narrow and usually coloured (red, blue...).
+  function confirmCrease(img, line, b, w, h) {
     const [W, H] = dims(img);
     const sx = W / w, sy = H / h;
     const bwFull = (b.x1 - b.x0 + 1) * sx;
     const R = Math.max(14, Math.round(bwFull * 0.035));
-    const fx = Math.round(x * sx);
-    const x0 = Math.max(0, fx - R), x1 = Math.min(W - 1, fx + R);
-    const sw = x1 - x0 + 1;
+    const sw = 2 * R + 1;
     const y0 = Math.round((b.y0 + (b.y1 - b.y0) * 0.1) * sy);
     const y1 = Math.round((b.y1 - (b.y1 - b.y0) * 0.1) * sy);
     const sh = y1 - y0 + 1;
-    if (sw < 12 || sh < 40) return { ok: false, why: 'strip too small' };
+    if (sh < 40) return { ok: false, why: 'strip too small' };
+    const centre = (y) => Math.round((line.a * (y / sy) + line.b) * sx);
 
-    const c = document.createElement('canvas');
-    c.width = sw;
-    c.height = sh;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, x0, y0, sw, sh, 0, 0, sw, sh);
-    const d = ctx.getImageData(0, 0, sw, sh).data;
+    // one rectangle that covers the whole leaning strip
+    let cMin = Infinity, cMax = -Infinity;
+    for (let y = y0; y <= y1; y += 8) { const c = centre(y); if (c < cMin) cMin = c; if (c > cMax) cMax = c; }
+    const rx0 = Math.max(0, cMin - R);
+    const rx1 = Math.min(W - 1, cMax + R);
+    const rw = rx1 - rx0 + 1;
+    if (rw < sw) return { ok: false, why: 'strip too small' };
+    const cv = document.createElement('canvas');
+    cv.width = rw;
+    cv.height = sh;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, rx0, y0, rw, sh, 0, 0, rw, sh);
+    const d = ctx.getImageData(0, 0, rw, sh).data;
 
     const rel = Array.from({ length: sw }, () => []);
     const chroma = Array.from({ length: sw }, () => []);
     const rowLum = new Float32Array(sw);
     for (let y = 0; y < sh; y++) {
+      const left = Math.min(Math.max(0, centre(y0 + y) - R - rx0), rw - sw);
       const rs = [];
       for (let i = 0; i < sw; i++) {
-        const p = (y * sw + i) * 4;
+        const p = (y * rw + left + i) * 4;
         rowLum[i] = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
         const mx = Math.max(d[p], d[p + 1], d[p + 2]);
         chroma[i].push(mx > 0 ? (mx - Math.min(d[p], d[p + 1], d[p + 2])) / mx : 0);
@@ -255,19 +305,21 @@
     let reg = blob.mask;
     let b = bounds(reg, w, h);
 
-    // Two-page spreads: cut at the crease and keep the bigger side.
+    // Two-page spreads: cut along the crease and keep the bigger side.
     const gutters = {};
+    const cutGap = 1; // the crease line is the darkest spot of the spine shadow; the page (and its ink) starts right after it
     for (const side of ['left', 'right']) {
       const found = findGutter(reg, lum, sat, w, h, b, side);
-      gutters[side] = { agree: Math.round(found.frac * 100) / 100, tint: Math.round((found.tint || 0) * 1000) / 1000, at: found.at, cut: found.x };
-      const x = found.x;
-      if (x < 0) continue;
-      const sure = confirmCrease(img, x, b, w, h);
+      gutters[side] = { depth: Math.round(found.depth * 1000) / 1000, tint: Math.round((found.tint || 0) * 1000) / 1000, at: found.at, slope: found.slope, k: found.k, cut: !!found.line };
+      const line = found.line;
+      if (!line) continue;
+      const sure = confirmCrease(img, line, b, w, h);
       gutters[side].confirm = sure;
       if (!sure.ok) continue;
       for (let y = 0; y < h; y++) {
+        const cut = line.a * y + line.b;
         for (let xx = 0; xx < w; xx++) {
-          if (side === 'left' ? xx <= x + 1 : xx >= x - 1) reg[y * w + xx] = 0;
+          if (side === 'left' ? xx <= cut + cutGap : xx >= cut - cutGap) reg[y * w + xx] = 0;
         }
       }
       b = bounds(reg, w, h);
