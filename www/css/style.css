@@ -148,7 +148,7 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
 .file-line strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ───── Page / image grids ───── */
-.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .tile { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .tile.selectable { cursor: pointer; }
 .tile.selected { outline: 3px solid var(--accent); outline-offset: -2px; }
@@ -170,7 +170,7 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
 .tile .meta { padding: 4px 8px; font-size: .75rem; color: var(--muted); text-align: center; }
 .tile .tools { display: flex; border-top: 1px solid var(--border); }
 .tile .tools button {
-  flex: 1; min-height: 44px; border: 0; border-right: 1px solid var(--border);
+  flex: 1; min-width: 0; padding: 0; min-height: 44px; border: 0; border-right: 1px solid var(--border);
   background: transparent; color: var(--text); cursor: pointer; display: grid; place-items: center;
 }
 .tile .tools button:last-child { border-right: 0; }
@@ -293,3 +293,29 @@ dialog::backdrop { background: #000a; }
 .cellbar strong { color: var(--accent); flex: none; }
 .cellbar .cv { word-break: break-word; white-space: pre-wrap; min-width: 0; }
 .cellbar .cf { color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; }
+
+/* ───── Auto-crop switch, crop editor ───── */
+.tile .crop-badge {
+  position: absolute; left: 6px; bottom: 50px; padding: 2px 8px; border-radius: 10px;
+  background: var(--accent); color: var(--accent-text); font-size: .7rem; font-weight: 700; pointer-events: none;
+}
+.auto-crop { align-items: flex-start; text-align: left; gap: 10px; font-weight: 400; min-height: 0; padding: 6px 0; white-space: normal; }
+.auto-crop input { margin-top: 2px; }
+.auto-crop strong { font-weight: 700; }
+.intro .auto-crop { max-width: 420px; margin: 4px auto 14px; }
+dialog.crop-dialog[open] {
+  display: flex; flex-direction: column; width: 100vw; height: 100dvh; max-width: none; max-height: none;
+  margin: 0; border: 0; border-radius: 0; background: var(--bg);
+  padding: var(--top) var(--right) var(--bottom) var(--left);
+}
+.crop-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.crop-head strong { flex: 1; }
+.crop-body { flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px; overflow: hidden; background: #0002; }
+.crop-stage { position: relative; }
+.crop-stage canvas, .crop-stage svg { position: absolute; left: 0; top: 0; display: block; }
+.crop-hint { margin: 0; text-align: center; padding: 8px 12px 0; }
+.crop-foot { display: flex; gap: 10px; justify-content: center; padding: 10px 12px 14px; }
+
+/* the switch sits inside the settings card, whose labels are stacked columns: keep it a row */
+.settings .auto-crop { flex-direction: row; color: var(--text); font-size: .9rem; font-weight: 400; }
+.settings .auto-crop .muted { font-size: .85rem; }

@@ -50,9 +50,18 @@ Big sheets load as you scroll, so a 50,000-row file won't freeze your phone. It'
 
 ### Images to PDF
 1. Tap **Choose images** (several at once) or **Take photo** for scanning paper documents.
-2. Use the arrows under each picture to reorder, **↻** to rotate, **✕** to remove. Tap **+ Add** for more.
-3. Pick a page size (A4, Letter, or same as the image), margin and quality, and give the file a name.
-4. Tap **Create PDF**.
+2. **Auto-crop pages** (on by default) finds the sheet of paper in each photo, cuts away the table or cloth behind it, and straightens it, like a scanner app. Photos that are already just a page are left alone. Those it cropped get a **Cropped** badge.
+3. Use the arrows under each picture to reorder, **↻** to rotate, **✕** to remove. Tap **+ Add** for more.
+4. Pick a page size (A4, Letter, or same as the image), margin and quality, and give the file a name.
+5. Tap **Create PDF**.
+
+**If the crop isn't quite right**, tap the crop icon under the picture and drag the four dots onto the corners of the page. **Find page** puts the dots back where the app thinks the edges are, and **Whole photo** removes the crop. Your original photo is never changed.
+
+Notebook photos work too: if you photographed an open notebook, it keeps just the page you're writing on and drops the facing page.
+
+<p align="center">
+  <img src="docs/screenshots/crop.png" width="240" alt="Dragging the four corner dots onto the page">
+</p>
 
 Photos taken sideways on your phone come out the right way up, and transparent PNGs get a white background.
 
@@ -105,6 +114,8 @@ Pocket PDF appears in Android's **Open with** list for PDFs, Excel/CSV files and
 **Where are my files saved?** In **Downloads → Pocket PDF**. Open your Files app, then Downloads.
 
 **Is it really private?** Yes. The app asks for no permissions: no internet, no storage, no camera access. Android itself blocks it from going online, and it only sees files you pick yourself.
+
+**The auto-crop cut the wrong part.** It works best when the page is lighter than what's behind it. On a white desk or a very dark, dim photo it may not find the edges. Tap the crop icon and drag the four dots, or switch **Auto-crop pages** off.
 
 **Why does my spreadsheet show old numbers or no charts?** The viewer shows the values saved in the file (formulas aren't recalculated), and it doesn't draw charts, images or cell colors. Merged cells show their text in the first cell. Password-protected spreadsheets can't be opened.
 

@@ -4,6 +4,7 @@
   const { h, icon, toast, Busy, Files, resultCard, App, cleanName, UserError, $ } = PP;
   const { buildPdf, layoutPage } = window.PdfKit;
 
+  const THUMB_PX = 440; // tiles are ~200 CSS px wide, which is 500+ device pixels on a phone
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i;
   const QUALITY = {
     high: { maxDim: 3000, q: 0.9 },
@@ -33,9 +34,11 @@
 
   // Draws the image rotated by `rot` degrees on a white canvas, longest side capped at maxDim.
   function drawImage(img, rot, maxDim) {
-    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-    const w = Math.max(1, Math.round(img.naturalWidth * scale));
-    const hgt = Math.max(1, Math.round(img.naturalHeight * scale));
+    const srcW = img.naturalWidth || img.width;   // <img> or canvas (a cropped page)
+    const srcH = img.naturalHeight || img.height;
+    const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+    const w = Math.max(1, Math.round(srcW * scale));
+    const hgt = Math.max(1, Math.round(srcH * scale));
     const turned = rot % 180 !== 0;
     const canvas = document.createElement('canvas');
     canvas.width = turned ? hgt : w;
@@ -50,19 +53,40 @@
     return canvas;
   }
 
-  async function renderJpeg(file, rot, { maxDim, q }) {
-    const canvas = drawImage(await loadImage(file), rot, maxDim);
+  // The photo, cut down to the page and straightened when a crop (quad) is set.
+  const pageSource = (img, quad, maxDim) => (quad ? DocScan.crop(img, quad, maxDim) : img);
+
+  async function renderJpeg(file, rot, { maxDim, q }, quad) {
+    const img = await loadImage(file);
+    const canvas = drawImage(pageSource(img, quad, maxDim), rot, maxDim);
     const { width: pxW, height: pxH } = canvas;
     const blob = await canvasToBlob(canvas, 'image/jpeg', q);
     canvas.width = canvas.height = 0; // release pixel memory early
     return { jpeg: new Uint8Array(await blob.arrayBuffer()), pxW, pxH };
   }
 
-  async function makeThumb(file) {
-    const canvas = drawImage(await loadImage(file), 0, 280);
+  async function thumbOf(img, quad) {
+    const canvas = drawImage(pageSource(img, quad, THUMB_PX), 0, THUMB_PX);
     const blob = await canvasToBlob(canvas, 'image/jpeg', 0.7);
     canvas.width = canvas.height = 0;
     return URL.createObjectURL(blob);
+  }
+
+  // Looks for the sheet of paper in a photo. Returns its four corners, or null when the photo is already just a page.
+  function findPage(img) {
+    try {
+      const found = DocScan.detect(img);
+      return found && !DocScan.isWholePhoto(found.quad) ? found.quad : null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }
+
+  async function prepare(file) {
+    const img = await loadImage(file);
+    const quad = autoCrop ? findPage(img) : null;
+    return { thumb: await thumbOf(img, quad), quad };
   }
 
   async function addImages(fileList) {
@@ -73,7 +97,7 @@
     await Busy.run('Loading images…', async (p) => {
       for (let i = 0; i < files.length; i++) {
         await p.tick(`Image ${i + 1} of ${files.length}`, i, files.length);
-        try { items.push({ id: nextId++, file: files[i], thumb: await makeThumb(files[i]), rot: 0 }); } catch (_) { failed.push(files[i].name); }
+        try { items.push({ id: nextId++, file: files[i], rot: 0, ...(await prepare(files[i])) }); } catch (_) { failed.push(files[i].name); }
       }
     });
     render();
@@ -94,8 +118,10 @@
     ui.grid.replaceChildren(...items.map((it, i) => h('li', { class: 'tile' },
       h('span', { class: 'frame' }, h('img', { src: it.thumb, alt: `Page ${i + 1}: ${it.file.name}`, style: `transform:rotate(${it.rot}deg)` })),
       h('span', { class: 'num' }, i + 1),
+      it.quad ? h('span', { class: 'crop-badge' }, 'Cropped') : null,
       h('div', { class: 'tools' },
         tileBtn('Move earlier', 'left', () => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; changed(); }, { disabled: i === 0 }),
+        tileBtn('Crop and straighten', 'crop', () => openEditor(it)),
         tileBtn('Rotate', 'rotate', () => { it.rot = (it.rot + 90) % 360; changed(); }),
         tileBtn('Move later', 'right', () => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; changed(); }, { disabled: i === n - 1 }),
         tileBtn('Remove', 'x', () => { URL.revokeObjectURL(it.thumb); items.splice(i, 1); changed(); }, { warn: true }),
@@ -118,7 +144,7 @@
       const pages = [];
       for (let i = 0; i < items.length; i++) {
         await p.tick(`Image ${i + 1} of ${items.length}`, i, items.length);
-        const img = await renderJpeg(items[i].file, items[i].rot, preset);
+        const img = await renderJpeg(items[i].file, items[i].rot, preset, items[i].quad);
         pages.push({ ...img, ...layoutPage(img.pxW, img.pxH, size, margin) });
       }
       await p.tick('Building PDF…');
@@ -128,6 +154,137 @@
     const name = `${cleanName(ui.name.value, stamp())}.pdf`;
     ui.result.replaceChildren(resultCard([{ name, blob: out.blob }], { title: 'PDF ready', note: `${out.count} page${out.count === 1 ? '' : 's'}` }));
     ui.result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── auto-crop setting (remembered) ──
+  let autoCrop = true;
+  try { autoCrop = localStorage.getItem('autocrop') !== 'off'; } catch (_) { /* storage may be blocked */ }
+  const autoBoxes = [];
+  function autoSwitch() {
+    const box = h('input', {
+      type: 'checkbox', checked: autoCrop,
+      onchange: (e) => {
+        autoCrop = e.target.checked;
+        try { localStorage.setItem('autocrop', autoCrop ? 'on' : 'off'); } catch (_) { /* ignore */ }
+        autoBoxes.forEach((b) => { b.checked = autoCrop; });
+      },
+    });
+    autoBoxes.push(box);
+    return h('label', { class: 'check auto-crop' }, box,
+      h('span', {}, h('strong', {}, 'Auto-crop pages'), h('span', { class: 'muted' }, ' Finds the paper in each photo, cuts away the background and straightens it.')));
+  }
+
+  // ── crop editor: drag the four corners ──
+  const SVG = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const wholeQuad = () => [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+  const insetQuad = () => [{ x: 0.06, y: 0.06 }, { x: 0.94, y: 0.06 }, { x: 0.94, y: 0.94 }, { x: 0.06, y: 0.94 }];
+  let ed = null;
+
+  function buildEditor() {
+    const canvas = h('canvas');
+    const svg = svgEl('svg');
+    svg.style.touchAction = 'none';
+    const shade = svgEl('path', { fill: 'rgba(0,0,0,.5)', 'fill-rule': 'evenodd' });
+    const outline = svgEl('polygon', { fill: 'none', stroke: '#2dd4bf', 'stroke-width': 2.5, 'stroke-linejoin': 'round' });
+    svg.append(shade, outline);
+    const grips = [0, 1, 2, 3].map(() => {
+      const g = svgEl('g', { style: 'cursor:grab' });
+      g.append(svgEl('circle', { r: 30, fill: 'transparent' }), svgEl('circle', { r: 12, fill: '#2dd4bf', stroke: '#fff', 'stroke-width': 3 }));
+      svg.append(g);
+      return g;
+    });
+    const stage = h('div', { class: 'crop-stage' }, canvas, svg);
+    const dlg = h('dialog', { class: 'crop-dialog' },
+      h('div', { class: 'crop-head' },
+        h('strong', {}, 'Crop and straighten'),
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => dlg.close() }, 'Cancel'),
+        h('button', { class: 'btn small primary', type: 'button', onclick: () => finishEditor() }, 'Done')),
+      h('div', { class: 'crop-body' }, stage),
+      h('p', { class: 'muted crop-hint' }, 'Drag the four dots onto the corners of the page.'),
+      h('div', { class: 'crop-foot' },
+        h('button', { class: 'btn', type: 'button', onclick: () => autoDetect(true) }, icon('wand', 18), 'Find page'),
+        h('button', { class: 'btn', type: 'button', onclick: () => { ed.quad = wholeQuad(); redrawEditor(); } }, 'Whole photo')));
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => { ed.img = null; });
+
+    let active = -1;
+    grips.forEach((g, i) => {
+      g.addEventListener('pointerdown', (e) => { active = i; g.setPointerCapture(e.pointerId); e.preventDefault(); });
+      g.addEventListener('pointermove', (e) => {
+        if (active !== i) return;
+        const r = svg.getBoundingClientRect();
+        ed.quad[i] = { x: clamp01((e.clientX - r.left) / r.width), y: clamp01((e.clientY - r.top) / r.height) };
+        redrawEditor();
+      });
+      const stop = () => { if (active === i) active = -1; };
+      g.addEventListener('pointerup', stop);
+      g.addEventListener('pointercancel', stop);
+    });
+    ed = { dlg, canvas, svg, shade, outline, grips, stage, quad: wholeQuad(), img: null, item: null, w: 0, h: 0 };
+  }
+
+  function redrawEditor() {
+    const { w, h: hgt, quad } = ed;
+    const P = quad.map((p) => [p.x * w, p.y * hgt]);
+    ed.outline.setAttribute('points', P.map((p) => p.join(',')).join(' '));
+    ed.shade.setAttribute('d', `M0 0H${w}V${hgt}H0Z M${P.map((p) => p.join(' ')).join(' L')}Z`);
+    ed.grips.forEach((g, i) => g.setAttribute('transform', `translate(${P[i][0]} ${P[i][1]})`));
+  }
+
+  function autoDetect(loud) {
+    const quad = ed.img ? findPage(ed.img) : null;
+    if (quad) { ed.quad = quad; redrawEditor(); } else if (loud) toast("Couldn't find the page edges. Drag the dots onto the corners.");
+    return !!quad;
+  }
+
+  async function openEditor(item) {
+    if (!ed) buildEditor();
+    ed.item = item;
+    const img = await Busy.run('Opening…', () => loadImage(item.file));
+    if (!img) return;
+    ed.img = img;
+    ed.dlg.showModal();
+    const body = ed.dlg.querySelector('.crop-body');
+    const ratio = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
+    const availW = body.clientWidth - 24;
+    const availH = body.clientHeight - 24;
+    const w = Math.round(Math.min(availW, availH * ratio));
+    const hgt = Math.round(w / ratio);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ed.w = w;
+    ed.h = hgt;
+    ed.canvas.width = Math.round(w * dpr);
+    ed.canvas.height = Math.round(hgt * dpr);
+    ed.canvas.style.width = `${w}px`;
+    ed.canvas.style.height = `${hgt}px`;
+    ed.svg.setAttribute('viewBox', `0 0 ${w} ${hgt}`);
+    ed.svg.setAttribute('width', w);
+    ed.svg.setAttribute('height', hgt);
+    ed.stage.style.width = `${w}px`;
+    ed.stage.style.height = `${hgt}px`;
+    const ctx = ed.canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, ed.canvas.width, ed.canvas.height);
+
+    ed.quad = item.quad ? item.quad.map((p) => ({ ...p })) : null;
+    if (!ed.quad) ed.quad = findPage(img) || insetQuad();
+    redrawEditor();
+  }
+
+  async function finishEditor() {
+    if (!DocScan.isSensible(ed.quad)) { toast("The four dots need to form a page shape. Move them so they don't cross over.", { ms: 6000 }); return; }
+    const item = ed.item;
+    const quad = DocScan.isWholePhoto(ed.quad) ? null : ed.quad.map((p) => ({ ...p }));
+    const img = ed.img;
+    ed.dlg.close();
+    const thumb = await Busy.run('Updating…', () => thumbOf(img, quad));
+    if (!thumb) return;
+    URL.revokeObjectURL(item.thumb);
+    item.thumb = thumb;
+    item.quad = quad;
+    changed();
   }
 
   const pickImages = async () => addImages(await Files.pick({ accept: 'image/*', multiple: true }));
@@ -141,6 +298,7 @@
       ui.empty = h('div', { class: 'card intro' },
         h('h2', {}, 'Photos and scans to PDF'),
         h('p', { class: 'muted' }, 'Pick pictures or take new ones, put them in order, get one PDF.'),
+        autoSwitch(),
         h('div', { class: 'row' },
           h('button', { class: 'btn primary', type: 'button', onclick: pickImages }, icon('image', 20), 'Choose images'),
           h('button', { class: 'btn', type: 'button', onclick: takePhoto }, icon('camera', 20), 'Take photo')));
@@ -160,6 +318,7 @@
           h('button', { class: 'btn small ghost danger', type: 'button', onclick: () => { items.forEach((i) => URL.revokeObjectURL(i.thumb)); items = []; changed(); } }, 'Clear')),
         ui.grid,
         h('div', { class: 'card settings' },
+          h('div', { class: 'wide' }, autoSwitch()),
           h('label', {}, 'Page size', ui.size),
           h('label', {}, 'Margin', ui.margin),
           h('label', {}, 'Quality', ui.quality),
