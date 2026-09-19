@@ -337,10 +337,18 @@ dialog.photo-dialog[open] {
   scrollbar-width: none; overscroll-behavior: contain;
 }
 .pv-track::-webkit-scrollbar { display: none; }
-.pv-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; display: grid; place-items: center; }
-.pv-slide img { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
+.pv-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; container-type: size; }
+/* the page is turned with CSS (so Rotate is instant): a sideways page swaps width and height so it still fits */
+.pv-slide img {
+  position: absolute; left: 50%; top: 50%; width: calc(100% - 12px); height: calc(100% - 12px); /* fallback for old WebViews */
+  width: calc(100cqw - 12px); height: calc(100cqh - 12px);
+  object-fit: contain; transform: translate(-50%, -50%);
+}
+.pv-slide img[data-rot="90"] { width: calc(100cqh - 12px); height: calc(100cqw - 12px); transform: translate(-50%, -50%) rotate(90deg); }
+.pv-slide img[data-rot="180"] { transform: translate(-50%, -50%) rotate(180deg); }
+.pv-slide img[data-rot="270"] { width: calc(100cqh - 12px); height: calc(100cqw - 12px); transform: translate(-50%, -50%) rotate(270deg); }
 .pv-slide img:not([src]) { visibility: hidden; }
-.pv-wait { color: #fffa; }
+.pv-slide img.lowres { filter: blur(1.5px); }
 .pv-nav {
   position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 64px; border: 0; padding: 0;
   display: grid; place-items: center; color: #fff; background: #0008; cursor: pointer;

@@ -1,7 +1,7 @@
 // Images → PDF
 (() => {
   'use strict';
-  const { h, icon, toast, Busy, Files, resultCard, App, cleanName, UserError, $ } = PP;
+  const { h, icon, toast, Busy, Files, resultCard, App, cleanName, UserError, sleep, $ } = PP;
   const { buildPdf, layoutPage } = window.PdfKit;
 
   const THUMB_PX = 440; // tiles are ~200 CSS px wide, which is 500+ device pixels on a phone
@@ -67,20 +67,44 @@
   }
 
   // Big picture for the full-screen view: the page as it will appear in the PDF, or the whole photo (`whole`).
-  // Cached on the item; dropBig() forgets it when the crop or rotation changes.
-  async function bigOf(item, whole) {
+  // Not rotated (the view turns it with CSS, so Rotate is instant). Cached on the item; dropBig() forgets it when the
+  // crop changes. Two callers asking for the same picture share one piece of work.
+  function bigOf(item, whole) {
     const key = whole && item.quad ? 'bigWhole' : 'big';
-    if (item[key]) return item[key];
-    const img = await loadImage(item.file);
-    const canvas = drawImage(pageSource(img, key === 'big' ? item.quad : null, VIEW_PX), item.rot, VIEW_PX);
-    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
-    canvas.width = canvas.height = 0;
-    if (!item[key]) item[key] = URL.createObjectURL(blob);
-    return item[key];
+    if (item[key]) return Promise.resolve(item[key]);
+    item.pend = item.pend || {};
+    if (!item.pend[key]) {
+      const ver = item.ver || 0;
+      item.pend[key] = (async () => {
+        const img = await loadImage(item.file);
+        const canvas = drawImage(pageSource(img, key === 'big' ? item.quad : null, VIEW_PX), 0, VIEW_PX);
+        const blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
+        canvas.width = canvas.height = 0;
+        const url = URL.createObjectURL(blob);
+        if ((item.ver || 0) !== ver) { URL.revokeObjectURL(url); return bigOf(item, whole); } // the crop changed meanwhile
+        item[key] = url;
+        return url;
+      })().finally(() => { delete item.pend[key]; });
+    }
+    return item.pend[key];
   }
 
   function dropBig(item) {
+    item.ver = (item.ver || 0) + 1;
     for (const k of ['big', 'bigWhole']) if (item[k]) { URL.revokeObjectURL(item[k]); item[k] = null; }
+  }
+
+  // Quietly prepares the big pictures one by one while you look at the list, so opening one is instant.
+  let warmToken = 0;
+  const stopWarm = () => { warmToken++; };
+  async function warm() {
+    const token = ++warmToken;
+    for (const it of items.slice()) {
+      if (token !== warmToken) return;
+      if (it.big || !items.includes(it)) continue;
+      try { await bigOf(it, false); } catch (_) { /* opened on demand instead */ }
+      await sleep(120);
+    }
   }
 
   function forget(item) { URL.revokeObjectURL(item.thumb); dropBig(item); }
@@ -121,6 +145,7 @@
       }
     });
     render();
+    warm();
     if (failed.length) toast(`Couldn't read: ${failed.join(', ')}. This phone may not support that image type.`, { ms: 8000 });
   }
 
@@ -146,7 +171,7 @@
       h('div', { class: 'tools' },
         tileBtn('Move earlier', 'left', () => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; changed(); }, { disabled: i === 0 }),
         tileBtn('Crop and straighten', 'crop', () => openEditor(it)),
-        tileBtn('Rotate', 'rotate', () => { it.rot = (it.rot + 90) % 360; dropBig(it); changed(); }),
+        tileBtn('Rotate', 'rotate', () => { it.rot = (it.rot + 90) % 360; changed(); }),
         tileBtn('Move later', 'right', () => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; changed(); }, { disabled: i === n - 1 }),
         tileBtn('Remove', 'x', () => { forget(it); items.splice(i, 1); changed(); }, { warn: true }),
       ))));
@@ -160,6 +185,7 @@
 
   async function create() {
     if (!items.length) return;
+    stopWarm(); // the phone is busy enough building the PDF
     ui.result.replaceChildren();
     const out = await Busy.run('Creating PDF…', async (p) => {
       const preset = QUALITY[ui.quality.value];
@@ -336,11 +362,11 @@
       h('div', { class: 'pv-stage' }, track, prev, next),
       h('div', { class: 'pv-bar' },
         act('Crop', 'crop', () => { const it = items[pv.index]; if (it) openEditor(it); }),
-        act('Rotate', 'rotate', () => { const it = items[pv.index]; if (!it) return; it.rot = (it.rot + 90) % 360; dropBig(it); changed(); buildSlides(pv.index); }),
+        act('Rotate', 'rotate', () => { const it = items[pv.index]; if (!it) return; it.rot = (it.rot + 90) % 360; changed(); pv.track.children[pv.index].querySelector('img').dataset.rot = it.rot; }),
         act('Save', 'save', () => savePhoto()),
         act('Remove', 'trash', () => removeCurrent(), 'warn')));
     document.body.append(dlg);
-    pv = { dlg, track, count, wholeBtn, prev, next, index: 0, whole: false, filling: 0 };
+    pv = { dlg, track, count, wholeBtn, prev, next, index: 0, whole: false };
 
     let settle;
     track.addEventListener('scroll', () => {
@@ -351,7 +377,6 @@
         fillAround(i);
       }, 60);
     }, { passive: true });
-    dlg.addEventListener('close', () => { pv.filling++; });
   }
 
   function syncBar() {
@@ -369,16 +394,19 @@
     pv.track.scrollTo({ left: i * pv.track.clientWidth, behavior: 'smooth' });
   }
 
-  // one slide per photo; the pictures are only made for the page on screen and its neighbours
+  // One slide per photo. Each starts with the small tile picture (already there) and swaps to the sharp one as soon as
+  // it is ready; the page on screen and its neighbours are prepared first.
   function buildSlides(index) {
     const { track } = pv;
     pv.index = Math.min(items.length - 1, Math.max(0, index));
     track.style.scrollSnapType = 'none';
     track.replaceChildren(...items.map((it, i) => {
-      const img = h('img', { alt: `Page ${i + 1}`, draggable: false });
-      const ready = it[pv.whole && it.quad ? 'bigWhole' : 'big'];
-      if (ready) img.src = ready;
-      return h('div', { class: 'pv-slide' }, img, ready ? null : h('span', { class: 'pv-wait' }, 'Loading…'));
+      const sharp = it[pv.whole && it.quad ? 'bigWhole' : 'big'];
+      const preview = pv.whole && it.quad ? null : it.thumb; // the tile picture is the cropped page
+      const img = h('img', { alt: `Page ${i + 1}`, draggable: false, 'data-rot': it.rot });
+      if (sharp || preview) img.src = sharp || preview;
+      if (!sharp) img.classList.add('lowres');
+      return h('div', { class: 'pv-slide' }, img);
     }));
     track.scrollLeft = pv.index * track.clientWidth;
     track.style.scrollSnapType = '';
@@ -386,23 +414,21 @@
     fillAround(pv.index);
   }
 
+  async function fillSlide(it) {
+    const whole = pv.whole;
+    const key = whole && it.quad ? 'bigWhole' : 'big';
+    let url;
+    try { url = await bigOf(it, whole); } catch (e) { console.error(e); return; }
+    if (pv.whole !== whole || it[key] !== url) return; // the view moved on (toggle or crop) while we worked
+    const slide = pv.track.children[items.indexOf(it)];
+    const img = slide && slide.querySelector('img');
+    if (!img || img.src === url) return;
+    img.src = url;
+    img.classList.remove('lowres');
+  }
+
   async function fillAround(i) {
-    const token = ++pv.filling;
-    for (const j of [i, i + 1, i - 1]) {
-      const it = items[j];
-      const slide = pv.track.children[j];
-      if (!it || !slide || slide.querySelector('img').getAttribute('src')) continue;
-      try {
-        const url = await bigOf(it, pv.whole);
-        if (token !== pv.filling || !pv.dlg.open) return;
-        const now = pv.track.children[j];
-        if (now && items[j] === it) { now.querySelector('img').src = url; const w = now.querySelector('.pv-wait'); if (w) w.remove(); }
-      } catch (e) {
-        console.error(e);
-        const w = slide.querySelector('.pv-wait');
-        if (w) w.textContent = 'This photo could not be opened';
-      }
-    }
+    for (const j of [i, i + 1, i - 1]) if (items[j]) await fillSlide(items[j]);
   }
 
   function openViewer(i) {
@@ -463,7 +489,7 @@
         h('div', { class: 'bar' }, ui.count, h('span', { class: 'spacer' }),
           h('button', { class: 'btn small', type: 'button', onclick: pickImages }, icon('plus', 18), 'Add'),
           h('button', { class: 'btn small ghost', type: 'button', onclick: takePhoto }, icon('camera', 18)),
-          h('button', { class: 'btn small ghost danger', type: 'button', onclick: () => { items.forEach(forget); items = []; changed(); } }, 'Clear')),
+          h('button', { class: 'btn small ghost danger', type: 'button', onclick: () => { stopWarm(); items.forEach(forget); items = []; changed(); } }, 'Clear')),
         ui.grid,
         h('div', { class: 'card settings' },
           h('div', { class: 'wide' }, autoSwitch()),
@@ -480,6 +506,7 @@
     enter(args) { if (args && args.files) addImages(args.files); },
 
     leave() {
+      stopWarm();
       if (pv && pv.dlg.open) pv.dlg.close();
       items.forEach(forget);
       items = [];
