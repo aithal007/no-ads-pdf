@@ -13,6 +13,9 @@ android/app/src/main/res/xml/config.xml
 # The APK is published under GitHub Releases instead of being committed
 *.apk
 
+# Built by scripts/package-extension.ps1, uploaded to the store dashboard directly
+pocket-pdf-extension.zip
+
 # Editor / OS noise
 .idea/
 .vscode/
