@@ -40,6 +40,11 @@ Password-protected PDFs ask for the password (it stays on your phone).
 The moon button turns on **night mode**, which inverts every page (white becomes black, and every colour flips to its opposite) so reading in the dark doesn't light up the room. It's remembered for next time. Photos and coloured diagrams inside the PDF invert too, so they'll look like a negative.
 The buttons at the top right save a copy or share the file.
 
+<p align="center">
+  <img src="docs/screenshots/night-before.png" width="220" alt="A PDF page, normal">
+  <img src="docs/screenshots/night-after.png" width="220" alt="The same page with night mode on">
+</p>
+
 ### View Excel
 Tap **View Excel**, choose a spreadsheet (`.xlsx`, `.xls`, `.csv`, `.ods`), and read it. Dates, currency and percentages look the way they do in Excel.
 Use the dropdown at the top to switch between sheets (hidden sheets stay hidden), **+ / −** to zoom, and **tap any cell** to see its full text and formula at the bottom of the screen.
