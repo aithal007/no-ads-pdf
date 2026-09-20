@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="stylesheet" href="css/style.css">
+  <title>Pocket PDF</title>
+</head>
+<body>
+  <header class="appbar">
+    <button id="back" class="icon-btn" type="button" aria-label="Back" hidden></button>
+    <div class="appbar-text">
+      <h1 id="title">Pocket PDF</h1>
+      <p class="sub" id="header-sub">Works fully offline. No ads, no uploads.</p>
+    </div>
+  </header>
+
+  <main id="screens"></main>
+
+  <div id="busy" hidden>
+    <div class="busy-box" role="alertdialog" aria-live="polite">
+      <p id="busy-text"></p>
+      <progress id="busy-bar"></progress>
+      <button class="btn small" id="busy-cancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <p id="toast" role="status" aria-live="polite" hidden></p>
+
+  <dialog id="pwd">
+    <form id="pwd-form" class="pwd">
+      <h2 id="pwd-title"></h2>
+      <p class="muted">Type the password to open it. It stays on your phone.</p>
+      <input id="pwd-input" type="password" autocomplete="off" placeholder="Password">
+      <p id="pwd-error" class="error" hidden>That password didn't work. Try again.</p>
+      <div class="row end">
+        <button class="btn ghost" id="pwd-cancel" type="button">Cancel</button>
+        <button class="btn primary" type="submit">Open</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="lib/capacitor.js"></script>
+  <script src="lib/fflate.min.js"></script>
+  <script src="lib/pdf-lib.min.js"></script>
+  <script src="js/pdfkit.js"></script>
+  <script src="js/docscan.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/tool-imgpdf.js"></script>
+  <script src="js/tool-merge.js"></script>
+  <script src="js/tool-pages.js"></script>
+  <script src="js/tool-compress.js"></script>
+  <script src="js/tool-convert.js"></script>
+  <script src="js/tool-viewer.js"></script>
+  <script src="js/tool-sheet.js"></script>
+  <script src="js/tool-zip.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Ad-free offline PDF toolkit for Android",
   "scripts": {
-    "libs": "node scripts/copy-libs.mjs"
+    "libs": "node scripts/copy-libs.mjs",
+    "build:extension": "node scripts/build-extension.mjs"
   },
   "keywords": [],
   "author": "",
