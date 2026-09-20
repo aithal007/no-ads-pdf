@@ -1,6 +1,6 @@
 # No Ads PDF
 
-**A free PDF toolkit with no ads, no sign-up and no internet access, for Android and Chrome.**
+**A free PDF toolkit with no ads, no sign-up and no internet access, for Android, Chrome and Edge.**
 View, merge, split, compress and convert PDFs, turn photos into PDFs, open Excel and CSV files, and open ZIP files, on your phone or your laptop.
 
 The app is called **Pocket PDF** on your phone. This repository is *no-ads-pdf*.
@@ -29,20 +29,21 @@ Needs **Android 10 or newer**. Nothing else to set up, no account and no permiss
 > The APK is signed with a personal debug key, not the Play Store. Android may show a "Play Protect" notice; choose **Install anyway**.
 > Because there's no Play Store, updates are manual: download the newer APK and install it over the old one.
 
-## On your laptop (Chrome extension)
+## On your laptop (Chrome or Edge extension)
 
-The same app also runs as a Chrome extension, with its own tab instead of a phone screen. It isn't on the Chrome
-Web Store, so you load it yourself, which takes about a minute:
+The same app also runs as a browser extension, with its own tab instead of a phone screen. It works in both
+**Chrome** and **Edge** (Edge is built on Chromium too), and isn't on either store, so you load it yourself,
+which takes about a minute:
 
 1. Download this repository ([Code → Download ZIP](../../archive/refs/heads/main.zip)) and unzip it, or `git clone` it.
-2. In Chrome, go to `chrome://extensions`, and switch on **Developer mode** (top right).
+2. Go to `chrome://extensions` (Chrome) or `edge://extensions` (Edge), and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the `extension` folder inside what you downloaded.
-4. Pin it (the puzzle-piece icon in the toolbar, then the pin next to Pocket PDF) so it's always one click away.
+4. Pin it (the puzzle-piece icon — in Edge it's the extensions icon — in the toolbar, then the pin next to Pocket PDF) so it's always one click away.
 
 Click the icon any time to open the app in a new tab. Drag and drop a file onto the home screen works too. Since
-a browser tab can't write straight to your Downloads folder without asking, **Save** triggers a normal Chrome
-download instead of the phone's silent save, and **Share** falls back to that if your version of Chrome has no
-share sheet — everything else works exactly like the phone app, including night mode.
+a browser tab can't write straight to your Downloads folder without asking, **Save** triggers a normal browser
+download instead of the phone's silent save, and **Share** falls back to that if your browser has no share sheet
+— everything else works exactly like the phone app, including night mode.
 
 ## How to use it
 
