@@ -37,6 +37,7 @@ Saved files go to **Downloads → Pocket PDF**, and the "Saved…" message has a
 ### View PDF
 Tap **View PDF**, choose a file, and read it. Scroll to move through pages, **pinch** or use **+ / −** to zoom, and tap the page counter (like `3 / 12`) to jump to a page.
 Password-protected PDFs ask for the password (it stays on your phone).
+The moon button turns on **night mode**, which inverts every page (white becomes black, and every colour flips to its opposite) so reading in the dark doesn't light up the room. It's remembered for next time. Photos and coloured diagrams inside the PDF invert too, so they'll look like a negative.
 The buttons at the top right save a copy or share the file.
 
 ### View Excel

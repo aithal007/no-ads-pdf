@@ -16,6 +16,11 @@
   let io = null;
   let gen = 0;          // bumps whenever a different document is opened
 
+  // ── night mode: inverts each page's colours (white↔black, every colour to its opposite) so a bright PDF
+  // doesn't light up a dark room. Pure CSS, so it costs nothing and needs no re-render. Remembered like auto-crop.
+  let night = false;
+  try { night = localStorage.getItem('pdfnight') === 'on'; } catch (_) { /* storage may be blocked */ }
+
   const dpr = () => Math.min(window.devicePixelRatio || 1, 2.5);
   const pageCssWidth = () => Math.max(120, (ui.scroll.clientWidth - 16) * zoom);
 
@@ -177,6 +182,13 @@
     })();
   }
 
+  function setNight(on) {
+    night = on;
+    ui.pages.classList.toggle('night', night);
+    ui.nightBtn.setAttribute('aria-pressed', String(night));
+    try { localStorage.setItem('pdfnight', night ? 'on' : 'off'); } catch (_) { /* ignore */ }
+  }
+
   const pick = async () => { const [f] = await Files.pick({ accept: 'application/pdf,.pdf' }); if (f) open(f, f.name); };
 
   function jump() {
@@ -199,8 +211,12 @@
 
       ui.pg = h('button', { class: 'btn small ghost pg', type: 'button', 'aria-label': 'Jump to page', onclick: jump }, '');
       ui.zoomLabel = h('span', { class: 'zl' }, '100%');
+      ui.nightBtn = h('button', {
+        class: 'btn small ghost', type: 'button', 'aria-label': 'Night mode', title: 'Night mode',
+        'aria-pressed': String(night), onclick: () => setNight(!night),
+      }, icon('moon', 18));
       ui.scroll = h('div', { class: 'vscroll' });
-      ui.pages = h('div', { class: 'vpages' });
+      ui.pages = h('div', { class: `vpages${night ? ' night' : ''}` });
       ui.scroll.append(ui.pages);
       ui.scroll.addEventListener('scroll', () => requestAnimationFrame(updateIndicator), { passive: true });
       ui.scroll.addEventListener('dblclick', () => setZoom(zoom > 1.2 ? 1 : 2));
@@ -214,6 +230,7 @@
           ui.zoomLabel,
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Zoom in', onclick: () => setZoom(zoom * 1.25) }, icon('plus', 18)),
           h('span', { class: 'spacer' }),
+          ui.nightBtn,
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Save a copy', onclick: () => src && Files.saveWithToast(src.blob, src.name) }, icon('save', 20)),
           h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Share', onclick: () => src && Files.share([src])}, icon('share', 20))),
         ui.scroll);

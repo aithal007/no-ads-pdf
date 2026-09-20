@@ -237,6 +237,12 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
 .vpages { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 8px 40px; min-width: 100%; width: max-content; box-sizing: border-box; }
 .vpage { background: #fff; box-shadow: 0 1px 6px #0004; flex: none; }
 .vpage canvas { display: block; width: 100%; height: 100%; }
+/* Night mode: each page's colours are inverted (white↔black, every colour to its opposite), so a bright PDF
+   doesn't light up a dark room. The dark placeholder is what an inverted white page looks like, shown while a
+   page is still off-screen (blank canvas) so there's no flash of white before it's drawn. */
+.vpages.night .vpage { background: #1c2422; }
+.vpages.night canvas { filter: invert(1); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: transparent; }
 
 /* ───── Busy overlay, toast, dialogs ───── */
 #busy { position: fixed; inset: 0; z-index: 50; background: #000a; display: grid; place-items: center; padding: 24px; }
