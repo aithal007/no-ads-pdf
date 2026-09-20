@@ -56,9 +56,21 @@
   }
 
   function currentPage() {
-    const mid = ui.scroll.scrollTop + ui.scroll.clientHeight / 2;
+    if (!pages.length) return 1;
+    // Scrolled all the way down: there's nothing past the last page, even if it (plus the trailing padding below
+    // it) is shorter than one screen and so its own top never quite reaches the top of the view.
+    const s = ui.scroll;
+    if (s.scrollTop + s.clientHeight >= s.scrollHeight - 1) return pages[pages.length - 1].n;
+    // Otherwise, the page whose top has scrolled to (or past) the top of the view. offsetTop is measured against
+    // a layout ancestor further up than the scroller itself and doesn't shift as .vscroll scrolls, so it can't be
+    // compared to scrollTop directly; getBoundingClientRect (viewport space) can, once put in the scroller's frame.
+    const scrollerTop = s.getBoundingClientRect().top;
+    const top = s.scrollTop + 1;
     let best = 1;
-    for (const pg of pages) { if (pg.el.offsetTop <= mid) best = pg.n; else break; }
+    for (const pg of pages) {
+      const y = pg.el.getBoundingClientRect().top - scrollerTop + s.scrollTop;
+      if (y <= top) best = pg.n; else break;
+    }
     return best;
   }
 
