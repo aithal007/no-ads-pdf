@@ -3,7 +3,7 @@
   "name": "Pocket PDF",
   "short_name": "Pocket PDF",
   "version": "1.0.0",
-  "description": "An offline, ad-free PDF toolkit: view, merge, split, compress, convert to/from images, night mode, Excel/CSV, ZIP. Nothing ever leaves your computer.",
+  "description": "Offline, ad-free PDF toolkit: view, merge, split, compress, convert, night mode, Excel/CSV, ZIP. Nothing leaves your device.",
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "action": {
     "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
