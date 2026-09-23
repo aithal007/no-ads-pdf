@@ -224,12 +224,29 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
   display: flex; flex-direction: column; background: var(--bg); z-index: 1;
 }
 .viewer-screen > .card { margin: 16px; }
-.vwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.vwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; }
 .vbar {
   flex: none; display: flex; align-items: center; gap: 4px;
   padding: 4px calc(var(--right) + 6px) 4px calc(var(--left) + 6px);
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
+/* The PDF viewer's toolbar floats over the page instead of taking its own row: collapsed to just a "more"
+   button by default, expands on tap/click, and closes again once you move away or tap elsewhere. */
+.vbar.vbar-float {
+  position: absolute; top: 10px; right: calc(var(--right) + 10px); z-index: 6; flex: none;
+  border: 1px solid var(--border); border-radius: 22px; background: var(--surface);
+  box-shadow: 0 2px 14px #0005; padding: 0; max-width: 44px; overflow: hidden;
+  flex-wrap: wrap; justify-content: flex-end; row-gap: 4px;
+  transition: max-width .18s ease, padding .18s ease;
+}
+.vbar.vbar-float .vbar-toggle { flex: none; }
+.vbar.vbar-float > *:not(.vbar-toggle) { opacity: 0; pointer-events: none; transition: opacity .1s ease; }
+.vbar.vbar-float.open {
+  /* never wider than the screen; wraps to a second row on a narrow phone instead of running off the edge */
+  max-width: min(460px, calc(100vw - var(--left) - var(--right) - 20px));
+  padding: 4px 8px 4px 4px; border-radius: 18px; overflow: visible;
+}
+.vbar.vbar-float.open > *:not(.vbar-toggle) { opacity: 1; pointer-events: auto; }
 .vbar .pg { min-width: 84px; font-weight: 700; }
 .vbar .zl { min-width: 46px; text-align: center; font-size: .82rem; color: var(--muted); font-weight: 600; }
 .vbar .btn.small { min-width: 44px; padding: 0 8px; }

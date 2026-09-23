@@ -235,17 +235,34 @@
       wirePinch();
       addEventListener('resize', () => { if (doc) layoutAll(); });
 
-      ui.viewer = h('div', { class: 'vwrap', hidden: true },
-        h('div', { class: 'vbar' },
-          ui.pg,
-          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Zoom out', onclick: () => setZoom(zoom / 1.25) }, icon('minus', 18)),
-          ui.zoomLabel,
-          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Zoom in', onclick: () => setZoom(zoom * 1.25) }, icon('plus', 18)),
-          h('span', { class: 'spacer' }),
-          ui.nightBtn,
-          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Save a copy', onclick: () => src && Files.saveWithToast(src.blob, src.name) }, icon('save', 20)),
-          h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Share', onclick: () => src && Files.share([src])}, icon('share', 20))),
-        ui.scroll);
+      let closeTimer;
+      const toolbarOpen = (on) => {
+        clearTimeout(closeTimer);
+        ui.vbar.classList.toggle('open', on);
+        ui.vbarToggle.setAttribute('aria-expanded', String(on));
+      };
+      const scheduleClose = () => { clearTimeout(closeTimer); closeTimer = setTimeout(() => toolbarOpen(false), 700); };
+      ui.vbarToggle = h('button', {
+        class: 'btn small ghost vbar-toggle', type: 'button', 'aria-label': 'Page tools', 'aria-expanded': 'false',
+        onclick: () => toolbarOpen(!ui.vbar.classList.contains('open')),
+      }, icon('dots', 18));
+
+      ui.vbar = h('div', { class: 'vbar vbar-float' },
+        ui.vbarToggle,
+        ui.pg,
+        h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Zoom out', onclick: () => setZoom(zoom / 1.25) }, icon('minus', 18)),
+        ui.zoomLabel,
+        h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Zoom in', onclick: () => setZoom(zoom * 1.25) }, icon('plus', 18)),
+        ui.nightBtn,
+        h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Save a copy', onclick: () => src && Files.saveWithToast(src.blob, src.name) }, icon('save', 20)),
+        h('button', { class: 'btn small ghost', type: 'button', 'aria-label': 'Share', onclick: () => src && Files.share([src]) }, icon('share', 20)));
+      // Mouse users: close a beat after the pointer leaves, so briefly crossing the gap to a button doesn't
+      // snap it shut. Touch users (no real hover): tapping the toggle again, or tapping the page, closes it.
+      ui.vbar.addEventListener('mouseenter', () => clearTimeout(closeTimer));
+      ui.vbar.addEventListener('mouseleave', scheduleClose);
+      ui.scroll.addEventListener('pointerdown', () => { if (ui.vbar.classList.contains('open')) toolbarOpen(false); });
+
+      ui.viewer = h('div', { class: 'vwrap', hidden: true }, ui.vbar, ui.scroll);
 
       root.append(ui.empty, ui.viewer);
     },
