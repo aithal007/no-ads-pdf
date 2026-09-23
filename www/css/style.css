@@ -59,7 +59,7 @@ p { margin: 0 0 12px; }
   background: var(--accent);
   color: var(--accent-text);
 }
-.appbar-text { min-width: 0; }
+.appbar-text { min-width: 0; max-width: 520px; } /* long filenames truncate even on a wide desktop/extension window */
 .appbar h1 { font-size: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .appbar .sub { margin: 0; font-size: .82rem; opacity: .85; }
 .icon-btn {

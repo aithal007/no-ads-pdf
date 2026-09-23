@@ -10,14 +10,5 @@
     "default_title": "Pocket PDF"
   },
   "background": { "service_worker": "background.js" },
-  "content_scripts": [
-    {
-      "matches": ["*://*/*.pdf", "*://*/*.PDF", "file:///*.pdf", "file:///*.PDF"],
-      "js": ["pdf-night.js"],
-      "run_at": "document_idle",
-      "all_frames": false
-    }
-  ],
-  "host_permissions": ["file:///*"],
   "permissions": []
 }

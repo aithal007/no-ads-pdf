@@ -31,9 +31,13 @@ Needs **Android 10 or newer**. Nothing else to set up, no account and no permiss
 
 ## On your laptop (Chrome or Edge extension)
 
-The same app also runs as a browser extension, with its own tab instead of a phone screen. It works in both
-**Chrome** and **Edge** (Edge is built on Chromium too), and isn't on either store, so you load it yourself,
-which takes about a minute:
+The same app also runs as a browser extension, with its own tab instead of a phone screen.
+
+**Edge:** install it straight from the Microsoft Edge Add-ons store — no setup needed:
+[**microsoftedge.microsoft.com/addons/detail/pocket-pdf/dohcgbjbcapincoehmifoimomgpkfepd**](https://microsoftedge.microsoft.com/addons/detail/pocket-pdf/dohcgbjbcapincoehmifoimomgpkfepd)
+
+**Chrome:** not on the Chrome Web Store yet, so load it yourself (works in Edge too, if you'd rather not wait
+for a store review):
 
 1. Download this repository ([Code → Download ZIP](../../archive/refs/heads/main.zip)) and unzip it, or `git clone` it.
 2. Go to `chrome://extensions` (Chrome) or `edge://extensions` (Edge), and switch on **Developer mode** (top right).
@@ -44,6 +48,10 @@ Click the icon any time to open the app in a new tab. Drag and drop a file onto 
 a browser tab can't write straight to your Downloads folder without asking, **Save** triggers a normal browser
 download instead of the phone's silent save, and **Share** falls back to that if your browser has no share sheet
 — everything else works exactly like the phone app, including night mode.
+
+Night mode only works inside the app's own tab, not directly inside Edge's or Chrome's built-in PDF viewer — a
+browser extension isn't allowed to touch another extension's pages, which is exactly what a built-in PDF viewer
+is under the hood.
 
 ## How to use it
 
