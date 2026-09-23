@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Pocket PDF",
   "short_name": "Pocket PDF",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Offline, ad-free PDF toolkit: view, merge, split, compress, convert, night mode, Excel/CSV, ZIP. Nothing leaves your device.",
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "action": {
@@ -10,5 +10,14 @@
     "default_title": "Pocket PDF"
   },
   "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*.pdf", "*://*/*.PDF", "file:///*.pdf", "file:///*.PDF"],
+      "js": ["pdf-night.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "host_permissions": ["file:///*"],
   "permissions": []
 }

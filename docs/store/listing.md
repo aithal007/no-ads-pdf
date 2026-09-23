@@ -66,3 +66,25 @@ it structurally cannot collect anything.
 **Icon**
 `extension/icons/icon128.png` (Partner Center may also ask for a separate square store icon — the same file
 works).
+
+## v1.1.0 update: night mode floats over any PDF, not just inside the app
+
+Adds `pdf-night.js` (a content script) so a moon button appears directly on top of any PDF Edge shows in its own
+viewer — clicking it inverts the whole page. This needs new permissions the v1.0.0 submission didn't have, so it
+goes through review again. When resubmitting:
+
+**Permission justification** (Privacy page, appears now that a content script/host permission is declared)
+```
+The extension adds an optional night-mode button to pages that are PDF files (matched by their .pdf extension),
+so a person doesn't have to leave Edge's own PDF viewer to invert the page's colours for reading in the dark.
+It needs to run on those pages to place that button and apply the colour filter when clicked; it reads or sends
+nothing from the page. file:///* is requested only so this also works for PDFs opened directly from disk (the
+person must separately enable "Allow access to file URLs" for the extension, which Edge always requires
+regardless of what a manifest declares).
+```
+
+**Single purpose description** — same one-purpose story as before still holds (local PDF/document viewing and
+editing); the content script is part of that same purpose, not a second one, so no change needed there.
+
+**Data collection questions** — still all unchecked. The content script reads nothing from the page and sends
+nothing anywhere; it only adds a button and a CSS filter.
