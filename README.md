@@ -61,9 +61,9 @@ Saved files go to **Downloads → Pocket PDF**, and the "Saved…" message has a
 ### View PDF
 Tap **View PDF**, choose a file, and read it. Scroll to move through pages, **pinch** or use **+ / −** to zoom, and tap the page counter (like `3 / 12`) to jump to a page.
 Password-protected PDFs ask for the password (it stays on your phone).
+You can **select and copy text** like in any PDF reader: drag across it with the mouse, or long-press on a phone. This works in night mode too. Scanned or handwritten pages are pictures with no text inside, so there's nothing to select in those.
+The zoom, night mode, save and share buttons are tucked behind the **⋯** button at the top right.
 The moon button turns on **night mode**, which inverts every page (white becomes black, and every colour flips to its opposite) so reading in the dark doesn't light up the room. It's remembered for next time. Photos and coloured diagrams inside the PDF invert too, so they'll look like a negative.
-The buttons at the top right save a copy or share the file.
-
 <p align="center">
   <img src="docs/screenshots/night-before.png" width="220" alt="A PDF page, normal">
   <img src="docs/screenshots/night-after.png" width="220" alt="The same page with night mode on">

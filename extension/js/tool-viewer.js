@@ -10,7 +10,8 @@
   const ui = {};
   let doc = null;
   let src = null;       // { blob, name }
-  let pages = [];       // [{ n, el, canvas, aspect, visible, queued }]
+  let pages = [];       // [{ n, el, canvas, aspect, pw, visible, queued, text }]
+  let lib = null;       // the pdf.js module (for its TextLayer)
   let zoom = 1;
   let chain = Promise.resolve();
   let io = null;
@@ -28,6 +29,29 @@
     const w = pageCssWidth();
     pg.el.style.width = `${w}px`;
     pg.el.style.height = `${w * pg.aspect}px`;
+    pg.el.style.setProperty('--total-scale-factor', w / pg.pw); // CSS px per PDF unit, sizes the text layer
+  }
+
+  // Invisible, selectable copies of the page's text laid over the picture, so text can be selected and copied.
+  // Built once per page; zooming only changes --total-scale-factor, which the layer is sized from.
+  async function drawText(pg) {
+    if (pg.text) return;
+    const page = await doc.getPage(pg.n);
+    const base = page.getViewport({ scale: 1 });
+    pg.pw = base.width;
+    sizePage(pg);
+    const div = h('div', { class: 'textLayer' });
+    const layer = new lib.TextLayer({
+      textContentSource: page.streamTextContent({ includeMarkedContent: true, disableNormalization: true }),
+      container: div,
+      viewport: page.getViewport({ scale: pageCssWidth() / base.width }),
+    });
+    pg.text = layer;
+    await layer.render();
+    if (pg.text !== layer) return; // released while its text was loading
+    div.append(h('div', { class: 'endOfContent' }));
+    pg.el.append(div);
+    pg.textDiv = div;
   }
 
   function requestDraw(pg) {
@@ -41,6 +65,7 @@
         const target = Math.min(pageCssWidth() * dpr(), MAX_CANVAS_WIDTH);
         await Pdf.render(doc, pg.n, { targetWidth: target, maxPixels: 9e6, canvas: pg.canvas });
         pg.drawnAt = zoom;
+        if (myGen === gen && pg.visible) await drawText(pg);
       } catch (_) { /* document closed mid-render */ }
     });
   }
@@ -48,6 +73,8 @@
   function release(pg) {
     pg.canvas.width = pg.canvas.height = 0; // frees the pixel memory of pages far off screen
     pg.drawnAt = null;
+    if (pg.text) { pg.text.cancel(); pg.text = null; }
+    if (pg.textDiv) { pg.textDiv.remove(); pg.textDiv = null; }
   }
 
   function layoutAll() {
@@ -157,6 +184,7 @@
     const first = await doc.getPage(1);
     const vp = first.getViewport({ scale: 1 });
     const defaultAspect = vp.height / vp.width;
+    lib = await Pdf.js();
 
     const myGen = gen;
     io = new IntersectionObserver((entries) => {
@@ -170,7 +198,7 @@
     pages = Array.from({ length: doc.numPages }, (_, i) => {
       const canvas = h('canvas', { width: 0, height: 0 }); // 0x0 until drawn, so unseen pages cost no memory
       const el = h('div', { class: 'vpage', 'data-page': i + 1 }, canvas);
-      const pg = { n: i + 1, el, canvas, aspect: defaultAspect, visible: false, queued: false, drawnAt: null };
+      const pg = { n: i + 1, el, canvas, aspect: defaultAspect, pw: vp.width, visible: false, queued: false, drawnAt: null, text: null, textDiv: null };
       el.__pg = pg;
       return pg;
     });
@@ -188,7 +216,7 @@
           const pgObj = await doc.getPage(pg.n);
           const v = pgObj.getViewport({ scale: 1 });
           const aspect = v.height / v.width;
-          if (Math.abs(aspect - pg.aspect) > 0.001) { pg.aspect = aspect; sizePage(pg); }
+          if (Math.abs(aspect - pg.aspect) > 0.001 || v.width !== pg.pw) { pg.aspect = aspect; pg.pw = v.width; sizePage(pg); }
         } catch (_) { return; }
       }
     })();
@@ -231,7 +259,14 @@
       ui.pages = h('div', { class: `vpages${night ? ' night' : ''}` });
       ui.scroll.append(ui.pages);
       ui.scroll.addEventListener('scroll', () => requestAnimationFrame(updateIndicator), { passive: true });
-      ui.scroll.addEventListener('dblclick', () => setZoom(zoom > 1.2 ? 1 : 2));
+      // Double-click on text selects a word, as in any PDF reader; anywhere else it toggles zoom.
+      ui.scroll.addEventListener('dblclick', (e) => { if (!e.target.closest('.textLayer span')) setZoom(zoom > 1.2 ? 1 : 2); });
+      // While dragging a selection, stretch the layer's end marker over the whole page so crossing a gap
+      // between lines doesn't make the selection jump to the end of the page (what pdf.js's own viewer does).
+      ui.pages.addEventListener('pointerdown', (e) => { const t = e.target.closest('.textLayer'); if (t) t.classList.add('selecting'); });
+      const doneSelecting = () => ui.pages.querySelectorAll('.textLayer.selecting').forEach((t) => t.classList.remove('selecting'));
+      addEventListener('pointerup', doneSelecting);
+      addEventListener('pointercancel', doneSelecting);
       wirePinch();
       addEventListener('resize', () => { if (doc) layoutAll(); });
 

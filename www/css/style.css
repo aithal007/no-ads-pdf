@@ -236,7 +236,9 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
   position: absolute; top: 10px; right: calc(var(--right) + 10px); z-index: 6; flex: none;
   border: 1px solid var(--border); border-radius: 22px; background: var(--surface);
   box-shadow: 0 2px 14px #0005; padding: 0; max-width: 44px; overflow: hidden;
-  flex-wrap: wrap; justify-content: flex-end; row-gap: 4px;
+  /* folded: one row, the hidden buttons clipped off to the right (wrapping would stack them into a tall
+     invisible column that blocks taps and text selection on the page beneath) */
+  flex-wrap: nowrap; justify-content: flex-start; row-gap: 4px;
   transition: max-width .18s ease, padding .18s ease;
 }
 .vbar.vbar-float .vbar-toggle { flex: none; }
@@ -245,6 +247,7 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
   /* never wider than the screen; wraps to a second row on a narrow phone instead of running off the edge */
   max-width: min(460px, calc(100vw - var(--left) - var(--right) - 20px));
   padding: 4px 8px 4px 4px; border-radius: 18px; overflow: visible;
+  flex-wrap: wrap; justify-content: flex-end;
 }
 .vbar.vbar-float.open > *:not(.vbar-toggle) { opacity: 1; pointer-events: auto; }
 .vbar .pg { min-width: 84px; font-weight: 700; }
@@ -252,8 +255,35 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent);
 .vbar .btn.small { min-width: 44px; padding: 0 8px; }
 .vscroll { flex: 1; min-height: 0; overflow: auto; touch-action: pan-x pan-y; background: #0002; padding-bottom: var(--bottom); overscroll-behavior: contain; }
 .vpages { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 8px 40px; min-width: 100%; width: max-content; box-sizing: border-box; }
-.vpage { background: #fff; box-shadow: 0 1px 6px #0004; flex: none; }
+.vpage { background: #fff; box-shadow: 0 1px 6px #0004; flex: none; position: relative; --scale-round-x: 1px; --scale-round-y: 1px; }
 .vpage canvas { display: block; width: 100%; height: 100%; }
+/* Selectable text: invisible copies of each line laid exactly over the page picture (pdf.js text layer). */
+.textLayer {
+  position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial;
+  letter-spacing: normal; word-spacing: normal; text-size-adjust: none; -webkit-text-size-adjust: none;
+  forced-color-adjust: none; transform-origin: 0 0; z-index: 0; color-scheme: only light;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer span, .textLayer br {
+  color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%;
+  -webkit-user-select: text; user-select: text;
+}
+.textLayer > :not(.markedContent), .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1; --font-height: 0; --scale-x: 1; --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent { display: contents; }
+.textLayer span[role="img"] { user-select: none; cursor: default; }
+.textLayer ::selection { background: rgb(0 90 255 / .3); color: transparent; }
+.textLayer br::selection { background: transparent; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
+.textLayer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.textLayer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.textLayer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
 /* Night mode: each page's colours are inverted (white↔black, every colour to its opposite), so a bright PDF
    doesn't light up a dark room. The dark placeholder is what an inverted white page looks like, shown while a
    page is still off-screen (blank canvas) so there's no flash of white before it's drawn. */
